@@ -1,7 +1,13 @@
 <?php
 session_start();
 require_once __DIR__ . '/database/functions.php';
-requireLogin();
+require_once __DIR__ . '/database/admin_functions.php';
+
+// Allow either a logged-in admin OR a logged-in normal user
+if (!isAdminLoggedIn() && !isLoggedIn()) {
+    header('Location: login.php');
+    exit;
+}
 
 /* Category coming from categories.php */
 $active_category = $_GET['category'] ?? '';
@@ -18,7 +24,7 @@ if (!function_exists('slugify')) {
     }
 }
 
-// ----- Clean any corrupted cart data (remove "undefined" entries) -----
+// ----- Clean any corrupted cart data -----
 if (isset($_SESSION['cart']) && is_array($_SESSION['cart'])) {
     foreach ($_SESSION['cart'] as $key => $item) {
         if (!isset($item['title']) || $item['title'] === '' || $item['title'] === 'undefined') {
@@ -39,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
     $image  = trim($_POST['image']  ?? '');
 
     if ($slug !== '' && $title !== '' && $price !== '') {
-        $price_float = (float) str_replace(['P', ',', ' '], '', $price);
+        $price_float = (float) str_replace(['₱', 'P', ',', ' '], '', $price);
 
         if (!isset($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
             $_SESSION['cart'] = [];
@@ -58,7 +64,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
         }
     }
 
-    // PRG: redirect so refresh doesn't re-add
     header('Location: ' . $_SERVER['PHP_SELF']);
     exit;
 }
@@ -68,9 +73,7 @@ if (isset($_GET['remove'])) {
     $index = $_GET['remove'];
     if (isset($_SESSION['cart'][$index])) {
         unset($_SESSION['cart'][$index]);
-        if (empty($_SESSION['cart'])) {
-            unset($_SESSION['cart']);
-        }
+        if (empty($_SESSION['cart'])) unset($_SESSION['cart']);
     }
     header('Location: ' . $_SERVER['PHP_SELF']);
     exit;
@@ -83,9 +86,24 @@ if (isset($_GET['clear'])) {
     exit;
 }
 
-// ----- Book data -----
-// ----- Book data (loaded from shared catalogue) -----
-$books = require __DIR__ . '/includes/books.php';
+// ============================================================
+// LOAD PRODUCTS FROM JSON (same source as admin.php)
+// ============================================================
+require_once __DIR__ . '/database/products.php';
+$products_json = getProducts();
+
+// Convert to the array shape your template uses:
+// [0] title, [1] author, [2] price, [3] image, [4] category
+$books = [];
+foreach ($products_json as $p) {
+    $books[] = [
+        $p['title']    ?? '',
+        $p['author']   ?? '',
+        '₱' . number_format((float)($p['price'] ?? 0), 2),
+        $p['image']    ?? '',
+        $p['category'] ?? '',
+    ];
+}
 
 // ----- Calculate cart totals -----
 $cart_total = 0;
@@ -134,9 +152,7 @@ if (!empty($_SESSION['cart'])) {
             border-bottom: 1px solid #eee;
             gap: 10px;
         }
-        .cart-item:last-of-type {
-            border-bottom: none;
-        }
+        .cart-item:last-of-type { border-bottom: none; }
         .remove-btn {
             color: #d9534f;
             font-weight: bold;
@@ -146,10 +162,7 @@ if (!empty($_SESSION['cart'])) {
             transition: transform 0.2s;
             line-height: 1;
         }
-        .remove-btn:hover {
-            transform: scale(1.3);
-            color: #c9302c;
-        }
+        .remove-btn:hover { transform: scale(1.3); color: #c9302c; }
         .clear-cart-btn {
             color: #d9534f;
             font-size: 0.9rem;
@@ -157,9 +170,7 @@ if (!empty($_SESSION['cart'])) {
             font-weight: 500;
             transition: color 0.2s;
         }
-        .clear-cart-btn:hover {
-            color: #c9302c;
-        }
+        .clear-cart-btn:hover { color: #c9302c; }
         #cartTotal {
             font-size: 1.6rem;
             font-weight: 700;
@@ -169,11 +180,7 @@ if (!empty($_SESSION['cart'])) {
             border-radius: 6px;
             white-space: nowrap;
         }
-        .cart-empty {
-            color: #888;
-            font-size: 0.95rem;
-            padding: 10px 0;
-        }
+        .cart-empty { color: #888; font-size: 0.95rem; padding: 10px 0; }
     </style>
 </head>
 <body>
@@ -188,14 +195,14 @@ if (!empty($_SESSION['cart'])) {
             <h3>FILTERS</h3>
             <h4>Category</h4>
             <?php foreach ($valid_categories as $c): ?>
-    <label>
-        <input type="checkbox"
-               class="filter-category"
-               value="<?= htmlspecialchars($c) ?>"
-               <?= $active_category === $c ? 'checked' : '' ?>>
-        <?= htmlspecialchars($c) ?>
-    </label>
-<?php endforeach; ?>
+                <label>
+                    <input type="checkbox"
+                           class="filter-category"
+                           value="<?= htmlspecialchars($c) ?>"
+                           <?= $active_category === $c ? 'checked' : '' ?>>
+                    <?= htmlspecialchars($c) ?>
+                </label>
+            <?php endforeach; ?>
             <h4>Price</h4>
             <label><input type="radio" name="price" value="all" checked> All</label>
             <label><input type="radio" name="price" value="low"> Under P500</label>
@@ -212,35 +219,105 @@ if (!empty($_SESSION['cart'])) {
                 </select>
             </div>
             <div class="product-grid" id="productGrid">
-            <?php foreach($books as $i => $book): ?>
-                <article class="product-card" data-category="<?= $book[4] ?>" data-price="<?= floatval(str_replace(['P',','],'',$book[2])) ?>" data-name="<?= strtolower($book[0]) ?>">
-    <div class="product-image">
-        <a href="book.php?slug=<?= urlencode(slugify($book[0])) ?>">
-            <img src="assets/books/<?= $book[3] ?>"
-                 alt="<?= clean($book[0]) ?>"
-                 onerror="this.src='assets/books/placeholder.png';">
-        </a>
-    </div>
-    <h3>
-        <a href="book.php?slug=<?= urlencode(slugify($book[0])) ?>">
-            <?= clean($book[0]) ?>
-        </a>
-    </h3>
-    <p><?= clean($book[1]) ?></p>
-    <strong><?= clean($book[2]) ?></strong>
+            <?php if (empty($books)): ?>
+                <p style="padding:20px; color:#888;">
+                    No products available.
+                    <?php if (isAdminLoggedIn()): ?>
+                        <a href="admin.php">Add one in the dashboard →</a>
+                    <?php endif; ?>
+                </p>
+            <?php else: ?>
+                <?php foreach ($books as $i => $book): ?>
+                    <article class="product-card"
+                             data-category="<?= htmlspecialchars($book[4]) ?>"
+                             data-price="<?= floatval(str_replace(['₱','P',','], '', $book[2])) ?>"
+                             data-name="<?= strtolower(htmlspecialchars($book[0])) ?>">
+                        <div class="product-image">
+                            <a href="book.php?slug=<?= urlencode(slugify($book[0])) ?>">
+                                <img src="assets/books/<?= htmlspecialchars($book[3]) ?>"
+                                     alt="<?= clean($book[0]) ?>"
+                                     onerror="this.src='assets/books/placeholder.png';">
+                            </a>
+                        </div>
+                        <h3>
+                            <a href="book.php?slug=<?= urlencode(slugify($book[0])) ?>">
+                                <?= clean($book[0]) ?>
+                            </a>
+                        </h3>
+                        <p><?= clean($book[1]) ?></p>
+                        <strong><?= clean($book[2]) ?></strong>
 
-    <form method="post" style="display:inline;">
-        <input type="hidden" name="add_to_cart" value="1">
-        <input type="hidden" name="slug"   value="<?= clean(slugify($book[0])) ?>">
-        <input type="hidden" name="title"  value="<?= clean($book[0]) ?>">
-        <input type="hidden" name="author" value="<?= clean($book[1]) ?>">
-        <input type="hidden" name="price"  value="<?= clean($book[2]) ?>">
-        <input type="hidden" name="image"  value="<?= clean($book[3]) ?>">
-        <button type="submit" class="add-product cart-btn">ADD TO CART</button>
-    </form>
-</article>
-            <?php endforeach; ?>
+                        <form method="post" style="display:inline;">
+                            <input type="hidden" name="add_to_cart" value="1">
+                            <input type="hidden" name="slug"   value="<?= clean(slugify($book[0])) ?>">
+                            <input type="hidden" name="title"  value="<?= clean($book[0]) ?>">
+                            <input type="hidden" name="author" value="<?= clean($book[1]) ?>">
+                            <input type="hidden" name="price"  value="<?= clean($book[2]) ?>">
+                            <input type="hidden" name="image"  value="<?= clean($book[3]) ?>">
+                            <button type="submit" class="add-product cart-btn">ADD TO CART</button>
+                        </form>
+                    </article>
+                <?php endforeach; ?>
+            <?php endif; ?>
             </div>
+
+            <!-- ===== CART PANEL ===== -->
+            <div id="cart" class="cart-panel">
+                <div style="flex:1;">
+                    <h2>🛒 Your Cart</h2>
+
+                    <?php if (empty($_SESSION['cart'])): ?>
+                        <p class="cart-empty">Your cart is empty.</p>
+                    <?php else: ?>
+                        <div id="cartItems">
+                            <?php
+                            $counter = 1;
+                            foreach ($_SESSION['cart'] as $index => $item):
+                            ?>
+                                <div class="cart-item">
+                                    <div style="flex:1;">
+                                        <strong><?= $counter ?>.</strong>
+                                        <?= clean($item['title']) ?>
+                                        <span style="color:#888; font-size:0.8rem; margin-left:6px;">
+                                            ×<?= (int)$item['qty'] ?>
+                                        </span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:12px;">
+                                        <span style="font-weight:600; color:var(--green); min-width:80px; text-align:right;">
+                                            ₱<?= number_format($item['price'] * $item['qty'], 2) ?>
+                                        </span>
+                                        <a href="?remove=<?= urlencode($index) ?>"
+                                           class="remove-btn"
+                                           title="Remove item"
+                                           onclick="return confirm('Remove this item from cart?')">✕</a>
+                                    </div>
+                                </div>
+                            <?php
+                                $counter++;
+                            endforeach;
+                            ?>
+
+                            <div style="margin-top:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                                <a href="?clear=1"
+                                   class="clear-cart-btn"
+                                   onclick="return confirm('Clear all items from cart?')">
+                                    🗑️ Clear All
+                                </a>
+                                <span style="font-size:0.85rem; color:#888;">
+                                    Total items: <?= (int)$total_items ?>
+                                </span>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px; min-width:120px;">
+                    <strong id="cartTotal">₱<?= number_format($cart_total, 2) ?></strong>
+                    <span style="font-size:0.7rem; color:#888;">Total</span>
+                </div>
+            </div>
+            <!-- END CART PANEL -->
+        </div>
     </section>
 </main>
 <?php include __DIR__ . '/includes/footer.php'; ?>

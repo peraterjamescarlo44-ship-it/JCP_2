@@ -8,6 +8,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+/* ---- Detect admin session (no need to load admin_functions.php) ---- */
+$is_admin = !empty($_SESSION['admin']['id']);
+
+/* ---- Cart count (only relevant for normal users) ---- */
 $cart_count = 0;
 if (!empty($_SESSION['cart']) && is_array($_SESSION['cart'])) {
     foreach ($_SESSION['cart'] as $item) {
@@ -15,18 +19,13 @@ if (!empty($_SESSION['cart']) && is_array($_SESSION['cart'])) {
     }
 }
 
+/* ---- Wishlist count ---- */
 $wishlist_count = 0;
 if (!empty($_SESSION['wishlist']) && is_array($_SESSION['wishlist'])) {
     $wishlist_count = count($_SESSION['wishlist']);
 }
 
-// Remove ensureDataFiles() – it's not needed here
-
-/* ---- ensure session is available ---- */
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
+/* ---- Current user ---- */
 $user = function_exists('currentUser') ? currentUser() : ($_SESSION['user'] ?? null);
 ?>
 <!-- STICKY WRAPPER: This keeps everything glued to the top -->
@@ -45,18 +44,32 @@ $user = function_exists('currentUser') ? currentUser() : ($_SESSION['user'] ?? n
             <span class="brand-sub">BOOKWORKS</span>
         </a>
 
-        <div class="search-wrap">
-            <input id="siteSearch" type="search" placeholder="Search for books..." autocomplete="off">
-            <button id="siteSearchBtn" aria-label="Search">⌕</button>
-            <div id="searchSuggestions" class="search-suggestions"></div>
-        </div>
+        <!-- Hide search on admin pages -->
+        <?php if (!$is_admin): ?>
+            <div class="search-wrap">
+                <input id="siteSearch" type="search" placeholder="Search for books..." autocomplete="off">
+                <button id="siteSearchBtn" aria-label="Search">⌕</button>
+                <div id="searchSuggestions" class="search-suggestions"></div>
+            </div>
+        <?php endif; ?>
 
         <div class="header-actions">
-            <a href="<?= $user ? 'account.php' : 'login.php' ?>" title="Account" aria-label="Account">👤︎</a>
-            <a href="wishlist.php" id="wishlistBtn" title="Wishlist" aria-label="Wishlist">♡ <span id="wishlistCount"><?= $wishlist_count ?></span>
-            </a>
-            <a href="cart.php" title="Cart" aria-label="Shopping cart"> 🛒︎ <span id="cartCount"><?= $cart_count ?></span>
-            </a>
+            <?php if ($is_admin): ?>
+                <!-- ADMIN: only show dashboard + logout -->
+                <a href="admin.php" title="Admin Dashboard" aria-label="Admin Dashboard" 
+                   style="font-size:14px; font-weight:600; letter-spacing:1px;">⚙ ADMIN</a>
+                <a href="admin_logout.php" title="Logout" aria-label="Logout"
+                   style="font-size:12px; font-weight:600; color:#d9534f;">LOGOUT</a>
+            <?php else: ?>
+                <!-- NORMAL USER: full icon set -->
+                <a href="<?= $user ? 'account.php' : 'login.php' ?>" title="Account" aria-label="Account">👤︎</a>
+                <a href="wishlist.php" id="wishlistBtn" title="Wishlist" aria-label="Wishlist">
+                    ♡ <span id="wishlistCount"><?= $wishlist_count ?></span>
+                </a>
+                <a href="cart.php" title="Cart" aria-label="Shopping cart">
+                    🛒︎ <span id="cartCount"><?= $cart_count ?></span>
+                </a>
+            <?php endif; ?>
         </div>
 
         <button class="mobile-menu" id="mobileMenu" aria-label="Toggle navigation menu">☰</button>
@@ -64,21 +77,35 @@ $user = function_exists('currentUser') ? currentUser() : ($_SESSION['user'] ?? n
 
     <nav class="main-nav" id="mainNav">
         <?php
-        // Auto-highlight active page
         $current = basename($_SERVER['PHP_SELF']);
-        $nav_links = [
-            'HOME'          => 'index.php',
-            'CATEGORIES'    => 'categories.php',
-            'BESTSELLERS'   => 'shop.php',
-            'NEW ARRIVALS'  => 'new_arrivals.php?new=1',
-            'ABOUT US'      => 'index.php#about',
-            'CONTACT'       => 'contact.php',
-        ];
+
+        // Different nav for admin vs user
+        if ($is_admin) {
+            $nav_links = [
+                'DASHBOARD'   => 'admin.php',
+                'PRODUCTS'    => 'admin.php#products',
+                'USERS'       => 'admin.php#users',
+                'VIEW SHOP'   => 'shop.php',
+                'HOME'        => 'index.php',
+            ];
+        } else {
+            $nav_links = [
+                'HOME'          => 'index.php',
+                'CATEGORIES'    => 'categories.php',
+                'BESTSELLERS'   => 'shop.php',
+                'NEW ARRIVALS'  => 'new_arrivals.php?new=1',
+                'ABOUT US'      => 'index.php#about',
+                'CONTACT'       => 'contact.php',
+            ];
+        }
+
         foreach ($nav_links as $label => $url):
             $active = '';
             if (strpos($url, '?') !== false) {
                 $parts = explode('?', $url);
                 if ($current === $parts[0] && isset($_GET['new'])) $active = 'active';
+            } elseif (strpos($url, '#') !== false) {
+                // anchor — don't mark active
             } elseif ($current === basename($url)) {
                 $active = 'active';
             }
