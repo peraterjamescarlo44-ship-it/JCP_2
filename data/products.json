@@ -1,0 +1,66 @@
+[
+    {
+        "id": 1,
+        "title": "Atomic Habits",
+        "author": "James Clear",
+        "price": 1123.12,
+        "image": "atomic-habits.png",
+        "category": "Self-Help"
+    },
+    {
+        "id": 2,
+        "title": "The Psychology of Money",
+        "author": "Morgan Housel",
+        "price": 599,
+        "image": "psychology_money.png",
+        "category": "Non-Fiction"
+    },
+    {
+        "id": 3,
+        "title": "It Ends With Us",
+        "author": "Colleen Hoover",
+        "price": 592.55,
+        "image": "it-ends-with-us.png",
+        "category": "Fiction"
+    },
+    {
+        "id": 4,
+        "title": "Rich Dad Poor Dad",
+        "author": "Robert Kiyosaki",
+        "price": 599,
+        "image": "rich-dad.png",
+        "category": "Non-Fiction"
+    },
+    {
+        "id": 5,
+        "title": "The Subtle Art of Not Giving a F*ck",
+        "author": "Mark Manson",
+        "price": 499,
+        "image": "subtle-art.png",
+        "category": "Self-Help"
+    },
+    {
+        "id": 6,
+        "title": "The Alchemist",
+        "author": "Paulo Coelho",
+        "price": 399,
+        "image": "alchemist.png",
+        "category": "Fiction"
+    },
+    {
+        "id": 7,
+        "title": "The Midnight Library",
+        "author": "Matt Haig",
+        "price": 349.22,
+        "image": "midnight.png",
+        "category": "Fiction"
+    },
+    {
+        "id": 8,
+        "title": "The Mastercut",
+        "author": "JCP Collection",
+        "price": 898.66,
+        "image": "mastercut.png",
+        "category": "Collection"
+    }
+]

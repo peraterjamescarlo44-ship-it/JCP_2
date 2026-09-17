@@ -7,3 +7,15 @@
 # Except the assets folder and EVERYTHING inside it
 !assets/
 !assets/**/*
+
+# Except the data folder and EVERYTHING inside it
+!data/
+!data/**/*
+
+# Except the database folder and EVERYTHING inside it
+!database/
+!database/**/*
+
+# Except the includes folder and EVERYTHING inside it
+!includes/
+!includes/**/*
